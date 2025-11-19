@@ -552,8 +552,10 @@ class ComplexNetRMSNorm(nn.Module):
     ):
         input_dtype = hidden_states_real.dtype
 
-        hidden_states_real.to(torch.float32)
-        hidden_states_imag.to(torch.float32)
+        # do the RMS computations in float32 for numerical stability
+        hidden_states_real = hidden_states_real.to(torch.float32)
+        hidden_states_imag = hidden_states_imag.to(torch.float32)
+
         magnitude = torch.mean(
             hidden_states_real**2 + hidden_states_imag**2, dim=-1, keepdim=True
         )
@@ -562,8 +564,12 @@ class ComplexNetRMSNorm(nn.Module):
         hidden_states_real = hidden_states_real * variance
         hidden_states_imag = hidden_states_imag * variance
 
-        rmsnorm_out_real = self.weight_real * hidden_states_real
-        rmsnorm_out_imag = self.weight_imag * hidden_states_imag
+        # cast weights to the computation dtype to avoid unexpected upcasts
+        weight_real = self.weight_real.to(hidden_states_real.dtype)
+        weight_imag = self.weight_imag.to(hidden_states_imag.dtype)
+
+        rmsnorm_out_real = weight_real * hidden_states_real
+        rmsnorm_out_imag = weight_imag * hidden_states_imag
 
         return rmsnorm_out_real.to(input_dtype), rmsnorm_out_imag.to(input_dtype)
 
